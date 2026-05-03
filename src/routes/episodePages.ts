@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { z } from "zod";
-import { episodePageUsecase, jobUsecase } from "../lib/container.js";
+import { episodePageUsecase, jobUsecase, mastraClient } from "../lib/container.js";
+import { mastraErrorMessage } from "../lib/mastraClient.js";
 import { saveEpisodePageSchema } from "../schemas/episodePage.js";
 import { numericId } from "../lib/params.js";
 import { JobType } from "../repositories/jobRepository.js";
@@ -29,57 +30,17 @@ app.delete("/", async (c) => {
 
 app.post("/generate", async (c) => {
   const episodeId = numericId.parse(c.req.param("episodeId"));
-  const mastraUrl = process.env.MASTRA_URL ?? "http://localhost:4111";
-  const runId = crypto.randomUUID();
-
-  const upstream = await fetch(
-    `${mastraUrl}/api/workflows/panel-layout-workflow/stream?runId=${runId}`,
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ inputData: { episodeId } }),
-    }
-  );
-
-  if (!upstream.ok) {
-    const detail = await upstream.text();
-    return c.json({ error: "Mastra error", detail }, 502);
-  }
-
+  const upstream = await mastraClient.stream("panel-layout-workflow", { episodeId });
   return new Response(upstream.body, {
-    headers: {
-      "Content-Type": "text/event-stream",
-      "Cache-Control": "no-cache",
-      "X-Accel-Buffering": "no",
-    },
+    headers: { "Content-Type": "text/event-stream", "Cache-Control": "no-cache", "X-Accel-Buffering": "no" },
   });
 });
 
 app.post("/generate-prompt", async (c) => {
   const episodeId = numericId.parse(c.req.param("episodeId"));
-  const mastraUrl = process.env.MASTRA_URL ?? "http://localhost:4111";
-  const runId = crypto.randomUUID();
-
-  const upstream = await fetch(
-    `${mastraUrl}/api/workflows/page-prompt-workflow/stream?runId=${runId}`,
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ inputData: { episodeId } }),
-    }
-  );
-
-  if (!upstream.ok) {
-    const detail = await upstream.text();
-    return c.json({ error: "Mastra error", detail }, 502);
-  }
-
+  const upstream = await mastraClient.stream("page-prompt-workflow", { episodeId });
   return new Response(upstream.body, {
-    headers: {
-      "Content-Type": "text/event-stream",
-      "Cache-Control": "no-cache",
-      "X-Accel-Buffering": "no",
-    },
+    headers: { "Content-Type": "text/event-stream", "Cache-Control": "no-cache", "X-Accel-Buffering": "no" },
   });
 });
 
@@ -87,35 +48,19 @@ const generateImageBodySchema = z.object({
   pageNumber: z.number().int().positive().optional(),
 });
 
-const WORKFLOW_BY_JOB_TYPE: Record<string, string> = {
-  [JobType.PANEL_LAYOUT]: "panel-layout-full-workflow",
-  [JobType.IMAGE_GENERATION]: "page-image-workflow",
-};
-
 app.get("/jobs", async (c) => {
   const episodeId = numericId.parse(c.req.param("episodeId"));
   const jobs = await jobUsecase.findRunningByEpisodeId(episodeId);
 
   // RUNNING ジョブの Mastra 実行状態を確認し、完了済みなら DB を更新する
-  const mastraUrl = process.env.MASTRA_URL ?? "http://localhost:4111";
   await Promise.all(
     jobs.map(async (job) => {
       try {
-        const workflowId = WORKFLOW_BY_JOB_TYPE[job.jobType] ?? "page-image-workflow";
-        const res = await fetch(
-          `${mastraUrl}/api/workflows/${workflowId}/runs/${job.mastraRunId}?fields=result,error`,
-        );
-        if (!res.ok) return;
-        const run = (await res.json()) as { status: string; result?: { usedModel?: string; imageModel?: string | null }; error?: unknown };
-        if (run.status === "success") await jobUsecase.markDone(job.id, run.result?.usedModel, run.result?.imageModel);
-        else if (run.status === "failed") {
-          const msg = run.error
-            ? typeof run.error === "string"
-              ? run.error
-              : (run.error as Record<string, unknown>).message as string | undefined ?? JSON.stringify(run.error)
-            : undefined;
-          await jobUsecase.markFailed(job.id, msg);
-        }
+        const workflowId = mastraClient.workflowIdForJobType(job.jobType);
+        const run = await mastraClient.getRunStatus(workflowId, job.mastraRunId);
+        const result = run.result as { usedModel?: string; imageModel?: string | null } | undefined;
+        if (run.status === "success") await jobUsecase.markDone(job.id, result?.usedModel, result?.imageModel);
+        else if (run.status === "failed") await jobUsecase.markFailed(job.id, mastraErrorMessage(run.error) ?? undefined);
       } catch {
         // Mastra への疎通失敗は無視
       }
@@ -138,30 +83,7 @@ app.get("/jobs", async (c) => {
 
 app.post("/generate-layout-job", async (c) => {
   const episodeId = numericId.parse(c.req.param("episodeId"));
-  const mastraUrl = process.env.MASTRA_URL ?? "http://localhost:4111";
-
-  const createRes = await fetch(`${mastraUrl}/api/workflows/panel-layout-full-workflow/create-run`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({}),
-  });
-  if (!createRes.ok) {
-    return c.json({ error: "Mastra error", detail: await createRes.text() }, 502);
-  }
-  const { runId } = (await createRes.json()) as { runId: string };
-
-  const startRes = await fetch(
-    `${mastraUrl}/api/workflows/panel-layout-full-workflow/start?runId=${runId}`,
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ inputData: { episodeId } }),
-    }
-  );
-  if (!startRes.ok) {
-    return c.json({ error: "Mastra error", detail: await startRes.text() }, 502);
-  }
-
+  const runId = await mastraClient.startJob("panel-layout-full-workflow", { episodeId });
   const job = await jobUsecase.create(episodeId, runId, undefined, JobType.PANEL_LAYOUT);
   return c.json({ jobId: job.id }, 201);
 });
@@ -171,30 +93,7 @@ app.post("/generate-image-job", async (c) => {
   const body = c.req.header("content-type")?.includes("application/json")
     ? generateImageBodySchema.parse(await c.req.json())
     : {};
-  const mastraUrl = process.env.MASTRA_URL ?? "http://localhost:4111";
-
-  const createRes = await fetch(`${mastraUrl}/api/workflows/page-image-workflow/create-run`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({}),
-  });
-  if (!createRes.ok) {
-    return c.json({ error: "Mastra error", detail: await createRes.text() }, 502);
-  }
-  const { runId } = (await createRes.json()) as { runId: string };
-
-  const startRes = await fetch(
-    `${mastraUrl}/api/workflows/page-image-workflow/start?runId=${runId}`,
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ inputData: { episodeId, ...body } }),
-    }
-  );
-  if (!startRes.ok) {
-    return c.json({ error: "Mastra error", detail: await startRes.text() }, 502);
-  }
-
+  const runId = await mastraClient.startJob("page-image-workflow", { episodeId, ...body });
   const job = await jobUsecase.create(episodeId, runId, body.pageNumber);
   return c.json({ jobId: job.id }, 201);
 });
@@ -204,29 +103,9 @@ app.post("/generate-image", async (c) => {
   const body = c.req.header("content-type")?.includes("application/json")
     ? generateImageBodySchema.parse(await c.req.json())
     : {};
-  const mastraUrl = process.env.MASTRA_URL ?? "http://localhost:4111";
-  const runId = crypto.randomUUID();
-
-  const upstream = await fetch(
-    `${mastraUrl}/api/workflows/page-image-workflow/stream?runId=${runId}`,
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ inputData: { episodeId, ...body } }),
-    }
-  );
-
-  if (!upstream.ok) {
-    const detail = await upstream.text();
-    return c.json({ error: "Mastra error", detail }, 502);
-  }
-
+  const upstream = await mastraClient.stream("page-image-workflow", { episodeId, ...body });
   return new Response(upstream.body, {
-    headers: {
-      "Content-Type": "text/event-stream",
-      "Cache-Control": "no-cache",
-      "X-Accel-Buffering": "no",
-    },
+    headers: { "Content-Type": "text/event-stream", "Cache-Control": "no-cache", "X-Accel-Buffering": "no" },
   });
 });
 

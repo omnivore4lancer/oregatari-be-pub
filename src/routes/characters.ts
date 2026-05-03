@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { stream } from "hono/streaming";
-import { characterUsecase } from "../lib/container.js";
+import { characterUsecase, mastraClient } from "../lib/container.js";
+import { forwardWorkflowStream } from "../lib/mastraClient.js";
 import {
   createCharacterSchema,
   updateCharacterSchema,
@@ -73,78 +74,17 @@ app.post("/:charId/generate-three-view", async (c) => {
     throw e;
   }
 
-  const mastraUrl = process.env.MASTRA_URL ?? "http://localhost:4111";
-  const workflowId = "character-three-view-workflow";
-
-  const createRunRes = await fetch(`${mastraUrl}/api/workflows/${workflowId}/create-run`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-  });
-  if (!createRunRes.ok) {
-    return c.json({ error: "Failed to create Mastra run" }, 502);
-  }
-  const { runId } = await createRunRes.json() as { runId: string };
-
-  const mastraRes = await fetch(
-    `${mastraUrl}/api/workflows/${workflowId}/stream?runId=${runId}`,
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ inputData: { characterId: charId } }),
-    },
+  const { response: mastraRes } = await mastraClient.createAndStream(
+    "character-three-view-workflow",
+    { characterId: charId },
   );
-
-  if (!mastraRes.ok || !mastraRes.body) {
-    return c.json({ error: "Mastra workflow stream failed" }, 502);
-  }
 
   c.header("Content-Type", "text/event-stream");
   c.header("Cache-Control", "no-cache");
   c.header("Connection", "keep-alive");
 
   return stream(c, async (s) => {
-    const reader = mastraRes.body!.getReader();
-    const decoder = new TextDecoder();
-    let buf = "";
-
-    const flush = async () => {
-      let depth = 0;
-      let inStr = false;
-      let esc = false;
-      let start = -1;
-
-      for (let i = 0; i < buf.length; i++) {
-        const ch = buf[i];
-        if (esc) { esc = false; continue; }
-        if (ch === "\\" && inStr) { esc = true; continue; }
-        if (ch === '"') { inStr = !inStr; continue; }
-        if (inStr) continue;
-        if (ch === "{") { if (depth++ === 0) start = i; }
-        else if (ch === "}" && depth > 0 && --depth === 0 && start >= 0) {
-          try {
-            const ev = JSON.parse(buf.slice(start, i + 1));
-            if (ev.type === "workflow-step-output" && ev.from === "USER") {
-              const text: string = ev.payload?.output;
-              if (text) await s.write(`data:${JSON.stringify({ text })}\n\n`);
-            }
-          } catch { /* ignore */ }
-          start = -1;
-        }
-      }
-      buf = start >= 0 ? buf.slice(start) : "";
-    };
-
-    try {
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        buf += decoder.decode(value, { stream: true });
-        await flush();
-      }
-      await s.write(`data:${JSON.stringify({ done: true })}\n\n`);
-    } finally {
-      reader.releaseLock();
-    }
+    await forwardWorkflowStream(s, mastraRes.body!, { sendDone: true });
   });
 });
 

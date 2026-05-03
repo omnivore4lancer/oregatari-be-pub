@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { ZodError } from "zod";
+import { MastraError } from "./lib/mastraClient.js";
 import { authMiddleware } from "./middleware/auth.js";
 import { storyOwnershipMiddleware } from "./middleware/storyOwnership.js";
 import users from "./routes/users.js";
@@ -30,12 +31,11 @@ app.use(
 app.use("/*", authMiddleware);
 
 app.onError((err, c) => {
-  if (err instanceof ZodError) {
-    return c.json({ error: "Validation error", details: err.issues }, 400);
-  }
-  console.error(err);
-  return c.json({ error: err.message || "Internal Server Error" }, 500);
-});
+  if (err instanceof ZodError) return c.json({ error: "Validation error", details: err.issues }, 400)
+  if (err instanceof MastraError) return c.json({ error: "Mastra error", detail: err.detail }, 502)
+  console.error(err)
+  return c.json({ error: err.message || "Internal Server Error" }, 500)
+})
 
 app.route("/users", users);
 app.route("/genres", genres);

@@ -45,3 +45,6 @@ export const characterRelationshipUsecase = new CharacterRelationshipUsecase(
 );
 export const episodePageUsecase = new EpisodePageUsecase(new EpisodePageRepository(prisma));
 export const jobUsecase = new JobUsecase(new JobRepository(prisma));
+
+import { MastraClient } from "./mastraClient.js"
+export const mastraClient = new MastraClient()

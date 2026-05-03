@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { z } from "zod";
-import { characterUsecase, episodeUsecase } from "../lib/container.js";
+import { characterUsecase, episodeUsecase, mastraClient } from "../lib/container.js";
 import {
   createEpisodeSchema,
   updateEpisodeSchema,
@@ -45,29 +45,10 @@ app.post("/generate/stream", async (c) => {
   if (!result.success) return c.json({ error: "Validation error", details: result.error.issues }, 400);
 
   const workflowInput = await buildWorkflowInput(storyId, result.data);
-  const mastraUrl = process.env.MASTRA_URL ?? "http://localhost:4111";
-  const runId = crypto.randomUUID();
-
-  const upstream = await fetch(
-    `${mastraUrl}/api/workflows/episode-generation-workflow/stream?runId=${runId}`,
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ inputData: workflowInput }),
-    }
-  );
-
-  if (!upstream.ok) {
-    const detail = await upstream.text();
-    return c.json({ error: "Mastra error", detail }, 502);
-  }
+  const upstream = await mastraClient.stream("episode-generation-workflow", workflowInput);
 
   return new Response(upstream.body, {
-    headers: {
-      "Content-Type": "text/event-stream",
-      "Cache-Control": "no-cache",
-      "X-Accel-Buffering": "no",
-    },
+    headers: { "Content-Type": "text/event-stream", "Cache-Control": "no-cache", "X-Accel-Buffering": "no" },
   });
 });
 
@@ -77,23 +58,7 @@ app.post("/generate/background", async (c) => {
   if (!result.success) return c.json({ error: "Validation error", details: result.error.issues }, 400);
 
   const workflowInput = await buildWorkflowInput(storyId, result.data);
-  const mastraUrl = process.env.MASTRA_URL ?? "http://localhost:4111";
-
-  const upstream = await fetch(
-    `${mastraUrl}/api/workflows/episode-generation-workflow/start-async`,
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ inputData: workflowInput }),
-    }
-  );
-
-  if (!upstream.ok) {
-    const detail = await upstream.text();
-    return c.json({ error: "Mastra error", detail }, 502);
-  }
-
-  const data = await upstream.json();
+  const data = await mastraClient.startAsync("episode-generation-workflow", workflowInput);
   return c.json(data, 202);
 });
 
