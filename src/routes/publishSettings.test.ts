@@ -7,6 +7,11 @@ vi.mock("../lib/container.js", () => ({
   publishSettingsUsecase: {
     getPublishSettings: vi.fn(),
     upsertPublishSettings: vi.fn(),
+    publishStory: vi.fn(),
+    unpublishStory: vi.fn(),
+  },
+  jobUsecase: {
+    createCoverImageJob: vi.fn(),
   },
 }));
 
@@ -43,6 +48,26 @@ describe("publishSettings routes", () => {
       });
       expect(res.status).toBe(200);
       expect(await res.json()).toEqual(saved);
+    });
+  });
+
+  describe("POST /stories/:storyId/publish/release", () => {
+    it("200 で publishedAt が設定された設定を返す", async () => {
+      const published = { storyId: 1, publishedAt: "2024-06-01T00:00:00.000Z" };
+      vi.mocked(publishSettingsUsecase.publishStory).mockResolvedValue(published as never);
+      const res = await app.request("/stories/1/publish/release", { method: "POST" });
+      expect(res.status).toBe(200);
+      expect(await res.json()).toEqual(published);
+    });
+  });
+
+  describe("DELETE /stories/:storyId/publish/release", () => {
+    it("200 で publishedAt が null になった設定を返す", async () => {
+      const unpublished = { storyId: 1, publishedAt: null };
+      vi.mocked(publishSettingsUsecase.unpublishStory).mockResolvedValue(unpublished as never);
+      const res = await app.request("/stories/1/publish/release", { method: "DELETE" });
+      expect(res.status).toBe(200);
+      expect(await res.json()).toEqual(unpublished);
     });
   });
 });

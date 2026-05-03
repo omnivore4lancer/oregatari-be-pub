@@ -1,5 +1,5 @@
 import type { UserRepository } from "../repositories/userRepository.js";
-import type { CreateUserInput, UpdateUserInput } from "../schemas/user.js";
+import type { CreateUserInput, SyncUserInput, UpdateUserInput } from "../schemas/user.js";
 
 export class UserUsecase {
   constructor(private readonly userRepo: UserRepository) {}
@@ -12,6 +12,14 @@ export class UserUsecase {
     const user = await this.userRepo.findById(id);
     if (!user) throw new UserNotFoundError(id);
     return user;
+  }
+
+  syncUser(input: SyncUserInput) {
+    return this.userRepo.upsertByUid(input);
+  }
+
+  findByUid(uid: string) {
+    return this.userRepo.findByUid(uid);
   }
 
   registerUser(input: CreateUserInput) {

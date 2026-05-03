@@ -15,8 +15,9 @@ function formatStory<T extends { storyGenres: { genre: { id: number; name: strin
 export class StoryRepository {
   constructor(private readonly prisma: PrismaClient) {}
 
-  async findAll() {
+  async findAll(userId: number) {
     const stories = await this.prisma.story.findMany({
+      where: { userId },
       include: {
         ...includeGenres,
         publishSettings: { select: { coverImageUrl: true } },
@@ -46,6 +47,11 @@ export class StoryRepository {
     });
   }
 
+  async isOwnedBy(storyId: number, userId: number): Promise<boolean> {
+    const count = await this.prisma.story.count({ where: { id: storyId, userId } });
+    return count > 0;
+  }
+
   async findById(id: number) {
     const story = await this.prisma.story.findUnique({
       where: { id },
@@ -55,11 +61,12 @@ export class StoryRepository {
     return formatStory(story);
   }
 
-  async create(input: CreateStoryInput) {
+  async create(input: CreateStoryInput, userId: number) {
     const { genreIds, ...rest } = input;
     const story = await this.prisma.story.create({
       data: {
         ...rest,
+        userId,
         storyGenres: { create: genreIds.map((genreId) => ({ genreId })) },
       },
       include: includeGenres,

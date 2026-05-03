@@ -57,6 +57,8 @@ model StoryGenre {
 
 model Story {
   id                 Int              @id @default(autoincrement())
+  userId             Int?             @map("user_id")
+  user               User?            @relation(fields: [userId], references: [user_id])
   name               String
   storyGenres        StoryGenre[]
   worldSetting       String           @map("world_setting")
@@ -221,15 +223,16 @@ model Panel {
 }
 
 model PublishSettings {
-  storyId       Int      @id @map("story_id")
-  characterIds  Int[]    @map("character_ids")
-  visualStyle   String?  @map("visual_style")
+  storyId       Int       @id @map("story_id")
+  characterIds  Int[]     @map("character_ids")
+  visualStyle   String?   @map("visual_style")
   layout        String?
   description   String?
   tags          String[]
-  coverImageUrl String?  @map("cover_image_url")
-  story         Story    @relation(fields: [storyId], references: [id])
-  updatedAt     DateTime @updatedAt @map("updated_at")
+  coverImageUrl String?   @map("cover_image_url")
+  publishedAt   DateTime? @map("published_at")
+  story         Story     @relation(fields: [storyId], references: [id])
+  updatedAt     DateTime  @updatedAt @map("updated_at")
 
   @@map("publish_settings")
 }

@@ -11,4 +11,12 @@ export class PublishSettingsUsecase {
   upsertPublishSettings(storyId: number, input: PublishSettingsInput) {
     return this.repo.upsert(storyId, input);
   }
+
+  publishStory(storyId: number) {
+    return this.repo.publish(storyId);
+  }
+
+  unpublishStory(storyId: number) {
+    return this.repo.unpublish(storyId);
+  }
 }

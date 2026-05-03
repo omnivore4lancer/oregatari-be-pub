@@ -19,6 +19,18 @@ app.put("/", async (c) => {
   return c.json(settings);
 });
 
+app.post("/release", async (c) => {
+  const storyId = numericId.parse(c.req.param("storyId"));
+  const settings = await publishSettingsUsecase.publishStory(storyId);
+  return c.json(settings);
+});
+
+app.delete("/release", async (c) => {
+  const storyId = numericId.parse(c.req.param("storyId"));
+  const settings = await publishSettingsUsecase.unpublishStory(storyId);
+  return c.json(settings);
+});
+
 app.post("/generate-cover-image-job", async (c) => {
   const storyId = numericId.parse(c.req.param("storyId"));
   const mastraUrl = process.env.MASTRA_URL ?? "http://localhost:4111";

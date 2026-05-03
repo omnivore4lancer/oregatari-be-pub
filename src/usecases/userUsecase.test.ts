@@ -52,7 +52,7 @@ describe("UserUsecase", () => {
     it("repo.create の結果をそのまま返す", async () => {
       const created = { user_id: 2, email: "b@example.com" };
       vi.mocked(repo.create).mockResolvedValue(created as never);
-      await expect(usecase.registerUser({ email: "b@example.com" })).resolves.toBe(created);
+      await expect(usecase.registerUser({ uid: "uid-2", email: "b@example.com" })).resolves.toBe(created);
     });
   });
 

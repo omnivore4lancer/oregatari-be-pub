@@ -1,6 +1,8 @@
 model User {
   user_id   Int      @id @default(autoincrement())
+  uid       String   @unique
   email     String   @unique
   name      String?
   createdAt DateTime @default(now()) @map("created_at")
+  stories   Story[]
 }

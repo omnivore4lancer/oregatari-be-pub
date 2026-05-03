@@ -26,7 +26,7 @@ describe("StoryUsecase", () => {
     it("findAll の結果をそのまま返す", async () => {
       const stories = [{ id: 1, name: "テスト" }];
       vi.mocked(repo.findAll).mockResolvedValue(stories as never);
-      await expect(usecase.getStories()).resolves.toBe(stories);
+      await expect(usecase.getStories(1)).resolves.toBe(stories);
     });
   });
 
@@ -53,7 +53,7 @@ describe("StoryUsecase", () => {
       const created = { id: 2, name: "新作" };
       vi.mocked(repo.create).mockResolvedValue(created as never);
       await expect(
-        usecase.createStory({ name: "新作", genreIds: [1], worldSetting: "現代日本", era: "MODERN" })
+        usecase.createStory({ name: "新作", genreIds: [1], worldSetting: "現代日本", era: "MODERN" }, 1)
       ).resolves.toBe(created);
     });
   });

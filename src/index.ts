@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { ZodError } from "zod";
 import { authMiddleware } from "./middleware/auth.js";
+import { storyOwnershipMiddleware } from "./middleware/storyOwnership.js";
 import users from "./routes/users.js";
 import stories from "./routes/stories.js";
 import characters from "./routes/characters.js";
@@ -39,6 +40,7 @@ app.onError((err, c) => {
 app.route("/users", users);
 app.route("/genres", genres);
 app.route("/stories", stories);
+app.use("/stories/:storyId/*", storyOwnershipMiddleware);
 app.route("/stories/:storyId/characters", characters);
 app.route("/stories/:storyId/episodes", episodes);
 app.route("/stories/:storyId/material-groups", materialGroups);

@@ -1,10 +1,19 @@
 import { Hono } from "hono";
 import { userUsecase } from "../lib/container.js";
-import { createUserSchema, updateUserSchema } from "../schemas/user.js";
+import type { AppEnv } from "../lib/honoTypes.js";
+import { createUserSchema, syncUserSchema, updateUserSchema } from "../schemas/user.js";
 import { UserNotFoundError } from "../usecases/userUsecase.js";
 import { numericId } from "../lib/params.js";
 
-const app = new Hono();
+const app = new Hono<AppEnv>();
+
+app.post("/sync", async (c) => {
+  const authUser = c.get("user");
+  const result = syncUserSchema.safeParse({ uid: authUser.id, email: authUser.email });
+  if (!result.success) return c.json({ error: "Validation error", details: result.error.issues }, 400);
+  const user = await userUsecase.syncUser(result.data);
+  return c.json(user);
+});
 
 app.get("/", async (c) => {
   const users = await userUsecase.getUsers();

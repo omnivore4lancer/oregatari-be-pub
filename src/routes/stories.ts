@@ -1,19 +1,34 @@
 import { Hono } from "hono";
 import { stream } from "hono/streaming";
-import { storyUsecase } from "../lib/container.js";
+import { storyUsecase, userUsecase } from "../lib/container.js";
+import type { AppEnv } from "../lib/honoTypes.js";
 import { createStorySchema, updateStorySchema } from "../schemas/story.js";
 import { StoryNotFoundError } from "../usecases/storyUsecase.js";
 import { numericId } from "../lib/params.js";
 
-const app = new Hono();
+const app = new Hono<AppEnv>();
+
+async function resolveUserId(uid: string): Promise<number | null> {
+  const user = await userUsecase.findByUid(uid);
+  return user?.user_id ?? null;
+}
+
+async function checkOwnership(storyId: number, uid: string): Promise<boolean> {
+  const userId = await resolveUserId(uid);
+  if (!userId) return false;
+  return storyUsecase.isOwnedBy(storyId, userId);
+}
 
 app.get("/", async (c) => {
-  const stories = await storyUsecase.getStories();
+  const userId = await resolveUserId(c.get("user").id);
+  if (!userId) return c.json({ error: "User not found" }, 404);
+  const stories = await storyUsecase.getStories(userId);
   return c.json(stories);
 });
 
 app.get("/:id", async (c) => {
   const id = numericId.parse(c.req.param("id"));
+  if (!await checkOwnership(id, c.get("user").id)) return c.json({ error: "Forbidden" }, 403);
   try {
     const story = await storyUsecase.getStory(id);
     return c.json(story);
@@ -24,14 +39,17 @@ app.get("/:id", async (c) => {
 });
 
 app.post("/", async (c) => {
+  const userId = await resolveUserId(c.get("user").id);
+  if (!userId) return c.json({ error: "User not found" }, 404);
   const result = createStorySchema.safeParse(await c.req.json());
   if (!result.success) return c.json({ error: "Validation error", details: result.error.issues }, 400);
-  const story = await storyUsecase.createStory(result.data);
+  const story = await storyUsecase.createStory(result.data, userId);
   return c.json(story, 201);
 });
 
 app.put("/:id", async (c) => {
   const id = numericId.parse(c.req.param("id"));
+  if (!await checkOwnership(id, c.get("user").id)) return c.json({ error: "Forbidden" }, 403);
   const result = updateStorySchema.safeParse(await c.req.json());
   if (!result.success) return c.json({ error: "Validation error", details: result.error.issues }, 400);
   const story = await storyUsecase.updateStory(id, result.data);
@@ -40,6 +58,7 @@ app.put("/:id", async (c) => {
 
 app.delete("/:id", async (c) => {
   const id = numericId.parse(c.req.param("id"));
+  if (!await checkOwnership(id, c.get("user").id)) return c.json({ error: "Forbidden" }, 403);
   await storyUsecase.deleteStory(id);
   return c.json({ message: "Deleted" });
 });
