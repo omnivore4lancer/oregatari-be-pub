@@ -47,7 +47,7 @@ app.delete("/:id", async (c) => {
 app.post("/:id/generate", async (c) => {
   const id = numericId.parse(c.req.param("id"));
   const mastraUrl = process.env.MASTRA_URL ?? "http://localhost:4111";
-  const workflowId = "storyGenerationWorkflow";
+  const workflowId = "story-generation-workflow";
 
   const createRunRes = await fetch(`${mastraUrl}/api/workflows/${workflowId}/create-run`, {
     method: "POST",

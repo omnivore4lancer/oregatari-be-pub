@@ -1,4 +1,5 @@
 import { Hono } from "hono";
+import { cors } from "hono/cors";
 import { ZodError } from "zod";
 import { authMiddleware } from "./middleware/auth.js";
 import users from "./routes/users.js";
@@ -15,6 +16,15 @@ import episodePages from "./routes/episodePages.js";
 import jobs from "./routes/jobs.js";
 
 const app = new Hono();
+
+app.use(
+  "/*",
+  cors({
+    origin: process.env.CORS_ORIGIN ?? "*",
+    allowMethods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allowHeaders: ["Content-Type", "Authorization"],
+  })
+);
 
 app.use("/*", authMiddleware);
 
