@@ -42,6 +42,7 @@ npx tsc --noEmit
 - **Route** (`src/routes/`): 外部入力をバリデーション。`schema.safeParse()` を呼ぶのはここだけ。バリデーションエラーは `safeParse` でインライン 400 応答として返す（Hono の `app.route()` はサブアプリのエラーハンドラを伝播しないため、ミドルウェア方式ではなく `safeParse` を使う）。パスパラメータは `numericId.parse()` を使い、エラーは `index.ts` の `onError` でキャッチされる。
 - **Usecase** (`src/usecases/`): 型が保証された入力でビジネスロジックを実行。`unknown` は受け取らない。
 - **Repository** (`src/repositories/`): 型付き引数を受け取り、DB 操作のみに集中。`parse()` は呼ばない。
+- **MastraClient** (`src/lib/mastraClient.ts`): Mastra との HTTP 通信はすべて `MastraClient` 経由で行う。ルートから直接 `fetch` で Mastra API を呼ばない。
 
 Zod スキーマと `*Input` 型は repository ファイルで定義し、route からインポートして使う。
 
