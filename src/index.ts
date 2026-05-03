@@ -39,8 +39,9 @@ app.onError((err, c) => {
 
 app.route("/users", users);
 app.route("/genres", genres);
-app.route("/stories", stories);
+app.use("/stories/:storyId", storyOwnershipMiddleware);
 app.use("/stories/:storyId/*", storyOwnershipMiddleware);
+app.route("/stories", stories);
 app.route("/stories/:storyId/characters", characters);
 app.route("/stories/:storyId/episodes", episodes);
 app.route("/stories/:storyId/material-groups", materialGroups);

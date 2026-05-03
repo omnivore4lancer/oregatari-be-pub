@@ -14,12 +14,6 @@ async function resolveUserId(uid: string): Promise<number | null> {
   return user?.user_id ?? null;
 }
 
-async function checkOwnership(storyId: number, uid: string): Promise<boolean> {
-  const userId = await resolveUserId(uid);
-  if (!userId) return false;
-  return storyUsecase.isOwnedBy(storyId, userId);
-}
-
 app.get("/", async (c) => {
   const userId = await resolveUserId(c.get("user").id);
   if (!userId) return c.json({ error: "User not found" }, 404);
@@ -29,7 +23,6 @@ app.get("/", async (c) => {
 
 app.get("/:id", async (c) => {
   const id = numericId.parse(c.req.param("id"));
-  if (!await checkOwnership(id, c.get("user").id)) return c.json({ error: "Forbidden" }, 403);
   try {
     const story = await storyUsecase.getStory(id);
     return c.json(story);
@@ -50,7 +43,6 @@ app.post("/", async (c) => {
 
 app.put("/:id", async (c) => {
   const id = numericId.parse(c.req.param("id"));
-  if (!await checkOwnership(id, c.get("user").id)) return c.json({ error: "Forbidden" }, 403);
   const result = updateStorySchema.safeParse(await c.req.json());
   if (!result.success) return c.json({ error: "Validation error", details: result.error.issues }, 400);
   const story = await storyUsecase.updateStory(id, result.data);
@@ -59,7 +51,6 @@ app.put("/:id", async (c) => {
 
 app.delete("/:id", async (c) => {
   const id = numericId.parse(c.req.param("id"));
-  if (!await checkOwnership(id, c.get("user").id)) return c.json({ error: "Forbidden" }, 403);
   await storyUsecase.deleteStory(id);
   return c.json({ message: "Deleted" });
 });

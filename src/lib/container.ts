@@ -24,6 +24,7 @@ import { EpisodePageRepository } from "../repositories/episodePageRepository.js"
 import { EpisodePageUsecase } from "../usecases/episodePageUsecase.js";
 import { JobRepository } from "../repositories/jobRepository.js";
 import { JobUsecase } from "../usecases/jobUsecase.js";
+import { MastraClient } from "./mastraClient.js";
 
 const prisma = new PrismaClient({
   adapter: new PrismaPg({ connectionString: process.env.DATABASE_URL }),
@@ -46,5 +47,4 @@ export const characterRelationshipUsecase = new CharacterRelationshipUsecase(
 export const episodePageUsecase = new EpisodePageUsecase(new EpisodePageRepository(prisma));
 export const jobUsecase = new JobUsecase(new JobRepository(prisma));
 
-import { MastraClient } from "./mastraClient.js"
 export const mastraClient = new MastraClient()

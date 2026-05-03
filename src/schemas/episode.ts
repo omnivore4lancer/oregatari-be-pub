@@ -41,3 +41,14 @@ export const updateEpisodeSchema = z
 
 export type CreateEpisodeInput = z.infer<typeof createEpisodeSchema>;
 export type UpdateEpisodeInput = z.infer<typeof updateEpisodeSchema>;
+
+export const generateEpisodeSchema = z.object({
+  relation: z.enum(["STANDALONE", "SEQUEL"]).default("STANDALONE"),
+  parentId: z.number().int().positive().optional(),
+  characterIds: z.array(z.number().int().positive()).default([]),
+  inheritRelation: z.boolean().default(true),
+  titleHint: z.string().optional(),
+  summaryHint: z.string().optional(),
+});
+
+export type GenerateEpisodeInput = z.infer<typeof generateEpisodeSchema>;

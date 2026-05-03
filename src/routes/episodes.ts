@@ -1,25 +1,17 @@
 import { Hono } from "hono";
-import { z } from "zod";
 import { characterUsecase, episodeUsecase, mastraClient } from "../lib/container.js";
 import {
   createEpisodeSchema,
   updateEpisodeSchema,
+  generateEpisodeSchema,
+  type GenerateEpisodeInput,
 } from "../schemas/episode.js";
 import { EpisodeNotFoundError } from "../usecases/episodeUsecase.js";
 import { numericId } from "../lib/params.js";
 
 const app = new Hono();
 
-const generateEpisodeSchema = z.object({
-  relation: z.enum(["STANDALONE", "SEQUEL"]).default("STANDALONE"),
-  parentId: z.number().int().positive().optional(),
-  characterIds: z.array(z.number().int().positive()).default([]),
-  inheritRelation: z.boolean().default(true),
-  titleHint: z.string().optional(),
-  summaryHint: z.string().optional(),
-});
-
-async function buildWorkflowInput(storyId: number, input: z.infer<typeof generateEpisodeSchema>) {
+async function buildWorkflowInput(storyId: number, input: GenerateEpisodeInput) {
   const [episodes, chars] = await Promise.all([
     episodeUsecase.getEpisodes(storyId),
     characterUsecase.getCharacters(storyId),
