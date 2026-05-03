@@ -1,0 +1,321 @@
+enum ArchetypeRole {
+  MENTOR       @map("メンター")
+  SHADOW       @map("シャドウ")
+  HERALD       @map("ヘラルド")
+  SHAPESHIFTER @map("シェイプシフター")
+
+  @@map("archetype_role")
+}
+
+enum Era {
+  MODERN   @map("現代")
+  MEDIEVAL @map("中世 / 古代")
+  FUTURE   @map("未来 / SF")
+
+  @@map("era")
+}
+
+enum EpisodeStatus {
+  UNPUBLISHED @map("未公開")
+  PUBLISHED   @map("公開中")
+
+  @@map("episode_status")
+}
+
+enum EpisodeRelation {
+  SEQUEL     @map("続編")
+  PARALLEL   @map("並列")
+  STANDALONE @map("単独")
+
+  @@map("episode_relation")
+}
+
+enum GeneratingState {
+  GENERATING @map("generating")
+  DONE       @map("done")
+
+  @@map("generating_state")
+}
+
+model Genre {
+  id          Int          @id @default(autoincrement())
+  name        String       @unique
+  storyGenres StoryGenre[]
+
+  @@map("genres")
+}
+
+model StoryGenre {
+  storyId Int   @map("story_id")
+  genreId Int   @map("genre_id")
+  story   Story @relation(fields: [storyId], references: [id])
+  genre   Genre @relation(fields: [genreId], references: [id])
+
+  @@id([storyId, genreId])
+  @@map("story_genres")
+}
+
+model Story {
+  id                 Int              @id @default(autoincrement())
+  name               String
+  storyGenres        StoryGenre[]
+  worldSetting       String           @map("world_setting")
+  era                Era
+  additionalElements String?          @map("additional_elements")
+  eraBg              String?          @map("era_bg")
+  intro              String?
+  dev                String?
+  climax             String?
+  conclusion         String?
+  characters              Character[]
+  characterRelationships  CharacterRelationship[]
+  episodes                Episode[]
+  materialGroups     MaterialGroup[]
+  materials          Material[]
+  panels             Panel[]
+  publishSettings    PublishSettings?
+  createdAt          DateTime         @default(now()) @map("created_at")
+  updatedAt          DateTime         @updatedAt @map("updated_at")
+
+  @@map("stories")
+}
+
+model Character {
+  id                 Int                    @id @default(autoincrement())
+  storyId            Int                    @map("story_id")
+  isProtagonist      Boolean                @default(false) @map("is_protagonist")
+  name               String
+  role               String?
+  archetypeRole      ArchetypeRole?         @map("archetype_role")
+  age                String?
+  gender             String?
+  overview           String?
+  appearance         String?
+  personality        String?
+  motivation         String?
+  background         String?
+  skills             String[]
+  avatarColor        String?                @map("avatar_color")
+  imageUrl           String?                @map("image_url")
+  imagePrompt        String?                @map("image_prompt")
+  story              Story                  @relation(fields: [storyId], references: [id])
+  relationshipsFrom  CharacterRelationship[] @relation("RelationshipFrom")
+  relationshipsTo    CharacterRelationship[] @relation("RelationshipTo")
+  episodeCharacters  EpisodeCharacter[]
+  createdAt          DateTime               @default(now()) @map("created_at")
+  updatedAt          DateTime               @updatedAt @map("updated_at")
+
+  @@map("characters")
+}
+
+model CharacterRelationship {
+  id              Int       @id @default(autoincrement())
+  storyId         Int       @map("story_id")
+  fromCharacterId Int       @map("from_character_id")
+  toCharacterId   Int       @map("to_character_id")
+  type            String
+  description     String?
+  story           Story     @relation(fields: [storyId], references: [id])
+  fromCharacter   Character @relation("RelationshipFrom", fields: [fromCharacterId], references: [id])
+  toCharacter     Character @relation("RelationshipTo", fields: [toCharacterId], references: [id])
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  @@unique([fromCharacterId, toCharacterId])
+  @@map("character_relationships")
+}
+
+model Episode {
+  id              Int               @id @default(autoincrement())
+  storyId         Int               @map("story_id")
+  number          Int
+  title           String
+  description     String?
+  content         String?
+  status          EpisodeStatus     @default(UNPUBLISHED)
+  relation        EpisodeRelation   @default(STANDALONE)
+  generatingState GeneratingState   @default(DONE) @map("generating_state")
+  parentId        Int?              @map("parent_id")
+  inheritRelation Boolean           @default(true) @map("inherit_relation")
+  parent          Episode?          @relation("EpisodeSequel", fields: [parentId], references: [id])
+  sequels         Episode[]         @relation("EpisodeSequel")
+  story           Story             @relation(fields: [storyId], references: [id])
+  characters      EpisodeCharacter[]
+  pages           EpisodePage[]
+  jobs            Job[]
+  createdAt       DateTime          @default(now()) @map("created_at")
+  updatedAt       DateTime          @updatedAt @map("updated_at")
+
+  @@map("episodes")
+}
+
+model EpisodeCharacter {
+  episodeId   Int       @map("episode_id")
+  characterId Int       @map("character_id")
+  importance  Int       @default(50)
+  episode     Episode   @relation(fields: [episodeId], references: [id])
+  character   Character @relation(fields: [characterId], references: [id])
+
+  @@id([episodeId, characterId])
+  @@map("episode_characters")
+}
+
+model MaterialGroup {
+  id        Int        @id @default(autoincrement())
+  storyId   Int        @map("story_id")
+  name      String
+  story     Story      @relation(fields: [storyId], references: [id])
+  materials Material[]
+  createdAt DateTime   @default(now()) @map("created_at")
+  updatedAt DateTime   @updatedAt @map("updated_at")
+
+  @@map("material_groups")
+}
+
+model Material {
+  id             Int           @id @default(autoincrement())
+  storyId        Int           @map("story_id")
+  groupId        Int           @map("group_id")
+  name           String
+  description    String?
+  aspectRatio    String        @map("aspect_ratio")
+  artStyle       String        @map("art_style")
+  locationMain   String        @map("location_main")
+  locationDetail String?       @map("location_detail")
+  worldSetting   String?       @map("world_setting")
+  timeSlot       String        @map("time_slot")
+  weather        String
+  skyDesc        String?       @map("sky_desc")
+  lighting       String?
+  fgLStructure   String?       @map("fg_l_structure")
+  fgLTexture     String?       @map("fg_l_texture")
+  fgLFurniture   String?       @map("fg_l_furniture")
+  fgLProps       String?       @map("fg_l_props")
+  mgCGround      String?       @map("mg_c_ground")
+  mgCDecoration  String?       @map("mg_c_decoration")
+  mgCAtmosphere  String?       @map("mg_c_atmosphere")
+  mgRStructure   String?       @map("mg_r_structure")
+  mgRItems       String?       @map("mg_r_items")
+  bgBuilding     String?       @map("bg_building")
+  bgTerrain      String?       @map("bg_terrain")
+  imageUrl       String?       @map("image_url")
+  story          Story         @relation(fields: [storyId], references: [id])
+  group          MaterialGroup @relation(fields: [groupId], references: [id])
+  createdAt      DateTime      @default(now()) @map("created_at")
+  updatedAt      DateTime      @updatedAt @map("updated_at")
+
+  @@map("materials")
+}
+
+model Panel {
+  id        String   @id
+  storyId   Int      @map("story_id")
+  vertices  Json
+  prompt    String   @default("")
+  imageUrl  String?  @map("image_url")
+  story     Story    @relation(fields: [storyId], references: [id])
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("panels")
+}
+
+model PublishSettings {
+  storyId       Int      @id @map("story_id")
+  characterIds  Int[]    @map("character_ids")
+  visualStyle   String?  @map("visual_style")
+  layout        String?
+  description   String?
+  tags          String[]
+  coverImageUrl String?  @map("cover_image_url")
+  story         Story    @relation(fields: [storyId], references: [id])
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  @@map("publish_settings")
+}
+
+enum JobStatus {
+  RUNNING @map("running")
+  DONE    @map("done")
+  FAILED  @map("failed")
+
+  @@map("job_status")
+}
+
+enum JobType {
+  IMAGE_GENERATION @map("image_generation")
+  PANEL_LAYOUT     @map("panel_layout")
+  COVER_IMAGE      @map("cover_image")
+
+  @@map("job_type")
+}
+
+model Job {
+  id           String    @id @default(uuid())
+  mastraRunId  String    @map("mastra_run_id")
+  episodeId    Int?      @map("episode_id")
+  storyId      Int?      @map("story_id")
+  pageNumber   Int?      @map("page_number")
+  jobType      JobType   @default(IMAGE_GENERATION) @map("job_type")
+  status       JobStatus @default(RUNNING)
+  errorMessage String?   @map("error_message")
+  usedModel    String?   @map("used_model")
+  imageModel   String?   @map("image_model")
+  episode      Episode?  @relation(fields: [episodeId], references: [id])
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+
+  @@map("jobs")
+}
+
+model EpisodePage {
+  id           Int              @id @default(autoincrement())
+  episodeId    Int              @map("episode_id")
+  pageNumber   Int              @map("page_number")
+  instructions String?
+  imagePrompt  String?          @map("image_prompt")
+  imageUrl     String?          @map("image_url")
+  episode      Episode          @relation(fields: [episodeId], references: [id])
+  rows         EpisodePageRow[]
+  createdAt    DateTime         @default(now()) @map("created_at")
+  updatedAt    DateTime         @updatedAt @map("updated_at")
+
+  @@unique([episodeId, pageNumber])
+  @@map("episode_pages")
+}
+
+model EpisodePageRow {
+  id          Int            @id @default(autoincrement())
+  pageId      Int            @map("page_id")
+  rowNumber   Int            @map("row_number")
+  heightRatio String         @map("height_ratio")
+  layoutType  String         @map("layout_type")
+  page        EpisodePage    @relation(fields: [pageId], references: [id], onDelete: Cascade)
+  panels      EpisodePanel[]
+
+  @@unique([pageId, rowNumber])
+  @@map("episode_page_rows")
+}
+
+model EpisodePanel {
+  id                   Int            @id @default(autoincrement())
+  rowId                Int            @map("row_id")
+  panelOrder           Int            @map("panel_order")
+  pagePosition         String?        @map("page_position")
+  description          String?
+  cameraAngle          String?        @map("camera_angle")
+  perspectiveIntensity String?        @map("perspective_intensity")
+  depthLayers          Json           @default("{}") @map("depth_layers")
+  background           String?
+  characters           Json           @default("[]")
+  effects              String[]
+  lensAndLighting      String?        @map("lens_and_lighting")
+  frame                String         @default("normal")
+  scale                Float          @default(1.0)
+  imagePrompt          String?        @map("image_prompt")
+  imageUrl             String?        @map("image_url")
+  row                  EpisodePageRow @relation(fields: [rowId], references: [id], onDelete: Cascade)
+
+  @@unique([rowId, panelOrder])
+  @@map("episode_panels")
+}
