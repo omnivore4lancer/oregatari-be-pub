@@ -32,10 +32,17 @@ export class MastraClient {
     return `${this.baseUrl}/api/workflows/${workflowId}${path}`
   }
 
+  private headers(withContentType = true): Record<string, string> {
+    const h: Record<string, string> = {}
+    if (withContentType) h["Content-Type"] = "application/json"
+    if (process.env.MASTRA_SECRET) h["X-Internal-Secret"] = process.env.MASTRA_SECRET
+    return h
+  }
+
   async createRun(workflowId: string): Promise<string> {
     const res = await fetch(this.url(workflowId, "/create-run"), {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: this.headers(),
     })
     if (!res.ok) throw new MastraError(await res.text())
     const { runId } = (await res.json()) as { runId: string }
@@ -46,7 +53,7 @@ export class MastraClient {
     const id = runId ?? crypto.randomUUID()
     const res = await fetch(this.url(workflowId, `/stream?runId=${id}`), {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: this.headers(),
       body: JSON.stringify({ inputData }),
     })
     if (!res.ok || !res.body) throw new MastraError(await res.text())
@@ -62,7 +69,7 @@ export class MastraClient {
   async startAsync(workflowId: string, inputData: unknown): Promise<unknown> {
     const res = await fetch(this.url(workflowId, "/start-async"), {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: this.headers(),
       body: JSON.stringify({ inputData }),
     })
     if (!res.ok) throw new MastraError(await res.text())
@@ -73,7 +80,7 @@ export class MastraClient {
     const runId = await this.createRun(workflowId)
     const res = await fetch(this.url(workflowId, `/start?runId=${runId}`), {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: this.headers(),
       body: JSON.stringify({ inputData }),
     })
     if (!res.ok) throw new MastraError(await res.text())
@@ -81,7 +88,9 @@ export class MastraClient {
   }
 
   async getRunStatus(workflowId: string, runId: string): Promise<MastraRun> {
-    const res = await fetch(this.url(workflowId, `/runs/${runId}?fields=result,error`))
+    const res = await fetch(this.url(workflowId, `/runs/${runId}?fields=result,error`), {
+      headers: this.headers(false),
+    })
     if (!res.ok) throw new MastraError(await res.text())
     return res.json() as Promise<MastraRun>
   }
@@ -89,6 +98,7 @@ export class MastraClient {
   async observe(workflowId: string, runId: string, signal?: AbortSignal): Promise<Response> {
     const res = await fetch(this.url(workflowId, `/observe?runId=${runId}`), {
       method: "POST",
+      headers: this.headers(false),
       signal,
     })
     if (!res.ok) throw new MastraError(await res.text())

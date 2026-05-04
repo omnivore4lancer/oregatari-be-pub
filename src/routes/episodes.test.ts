@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { Hono } from "hono";
 import episodes from "./episodes.js";
-import { episodeUsecase } from "../lib/container.js";
+import { episodeUsecase, characterUsecase, mastraClient } from "../lib/container.js";
 import { EpisodeNotFoundError } from "../usecases/episodeUsecase.js";
 
 vi.mock("../lib/container.js", () => ({
@@ -11,6 +11,13 @@ vi.mock("../lib/container.js", () => ({
     createEpisode: vi.fn(),
     updateEpisode: vi.fn(),
     deleteEpisode: vi.fn(),
+  },
+  characterUsecase: {
+    getCharacters: vi.fn(),
+  },
+  mastraClient: {
+    stream: vi.fn(),
+    startAsync: vi.fn(),
   },
 }));
 
@@ -102,6 +109,47 @@ describe("episodes routes", () => {
       vi.mocked(episodeUsecase.deleteEpisode).mockRejectedValue(new EpisodeNotFoundError(99));
       const res = await app.request("/stories/1/episodes/99", { method: "DELETE" });
       expect(res.status).toBe(404);
+    });
+  });
+
+  describe("POST /stories/:storyId/episodes/generate/stream", () => {
+    it("text/event-stream で SSE を返す", async () => {
+      const emptyBody = new ReadableStream({ start(c) { c.close(); } });
+      vi.mocked(episodeUsecase.getEpisodes).mockResolvedValue([] as never);
+      vi.mocked(characterUsecase.getCharacters).mockResolvedValue([] as never);
+      vi.mocked(mastraClient.stream).mockResolvedValue(new Response(emptyBody) as never);
+      const res = await app.request("/stories/1/episodes/generate/stream", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+      });
+      expect(res.status).toBe(200);
+      expect(res.headers.get("content-type")).toContain("text/event-stream");
+    });
+
+    it("バリデーションエラーのとき 400 を返す", async () => {
+      const res = await app.request("/stories/1/episodes/generate/stream", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ relation: "INVALID" }),
+      });
+      expect(res.status).toBe(400);
+    });
+  });
+
+  describe("POST /stories/:storyId/episodes/generate/background", () => {
+    it("202 で runId を返す", async () => {
+      const data = { runId: "run-123", status: "PENDING" };
+      vi.mocked(episodeUsecase.getEpisodes).mockResolvedValue([] as never);
+      vi.mocked(characterUsecase.getCharacters).mockResolvedValue([] as never);
+      vi.mocked(mastraClient.startAsync).mockResolvedValue(data as never);
+      const res = await app.request("/stories/1/episodes/generate/background", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+      });
+      expect(res.status).toBe(202);
+      expect(await res.json()).toEqual(data);
     });
   });
 });

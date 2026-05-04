@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { Hono } from "hono";
 import publishSettings from "./publishSettings.js";
-import { publishSettingsUsecase } from "../lib/container.js";
+import { publishSettingsUsecase, jobUsecase, mastraClient } from "../lib/container.js";
 
 vi.mock("../lib/container.js", () => ({
   publishSettingsUsecase: {
@@ -12,6 +12,9 @@ vi.mock("../lib/container.js", () => ({
   },
   jobUsecase: {
     createCoverImageJob: vi.fn(),
+  },
+  mastraClient: {
+    startJob: vi.fn(),
   },
 }));
 
@@ -68,6 +71,20 @@ describe("publishSettings routes", () => {
       const res = await app.request("/stories/1/publish/release", { method: "DELETE" });
       expect(res.status).toBe(200);
       expect(await res.json()).toEqual(unpublished);
+    });
+  });
+
+  describe("POST /stories/:storyId/publish/generate-cover-image-job", () => {
+    it("201 で jobId を返す", async () => {
+      vi.mocked(mastraClient.startJob).mockResolvedValue("run-123" as never);
+      vi.mocked(jobUsecase.createCoverImageJob).mockResolvedValue({ id: 10 } as never);
+      const res = await app.request("/stories/1/publish/generate-cover-image-job", {
+        method: "POST",
+      });
+      expect(res.status).toBe(201);
+      expect(await res.json()).toEqual({ jobId: 10 });
+      expect(mastraClient.startJob).toHaveBeenCalledWith("cover-image-workflow", { storyId: 1 });
+      expect(jobUsecase.createCoverImageJob).toHaveBeenCalledWith(1, "run-123");
     });
   });
 });

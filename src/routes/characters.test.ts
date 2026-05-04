@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { Hono } from "hono";
 import characters from "./characters.js";
-import { characterUsecase } from "../lib/container.js";
+import { characterUsecase, mastraClient } from "../lib/container.js";
 import { CharacterNotFoundError } from "../usecases/characterUsecase.js";
 
 vi.mock("../lib/container.js", () => ({
@@ -12,6 +12,13 @@ vi.mock("../lib/container.js", () => ({
     updateCharacter: vi.fn(),
     deleteCharacter: vi.fn(),
   },
+  mastraClient: {
+    createAndStream: vi.fn(),
+  },
+}));
+
+vi.mock("../lib/mastraClient.js", () => ({
+  forwardWorkflowStream: vi.fn().mockResolvedValue(undefined),
 }));
 
 const app = new Hono().route("/stories/:storyId/characters", characters);
@@ -99,6 +106,30 @@ describe("characters routes", () => {
         new CharacterNotFoundError(99)
       );
       const res = await app.request("/stories/1/characters/99", { method: "DELETE" });
+      expect(res.status).toBe(404);
+    });
+  });
+
+  describe("POST /stories/:storyId/characters/:charId/generate-three-view", () => {
+    it("text/event-stream で SSE を返す", async () => {
+      const emptyBody = new ReadableStream({ start(c) { c.close(); } });
+      vi.mocked(characterUsecase.getCharacter).mockResolvedValue({ id: 1, storyId: 1 } as never);
+      vi.mocked(mastraClient.createAndStream).mockResolvedValue({
+        runId: "run-1",
+        response: new Response(emptyBody),
+      } as never);
+      const res = await app.request("/stories/1/characters/1/generate-three-view", {
+        method: "POST",
+      });
+      expect(res.status).toBe(200);
+      expect(res.headers.get("content-type")).toContain("text/event-stream");
+    });
+
+    it("キャラクターが存在しないとき 404 を返す", async () => {
+      vi.mocked(characterUsecase.getCharacter).mockRejectedValue(new CharacterNotFoundError(99));
+      const res = await app.request("/stories/1/characters/99/generate-three-view", {
+        method: "POST",
+      });
       expect(res.status).toBe(404);
     });
   });

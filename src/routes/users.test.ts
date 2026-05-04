@@ -3,21 +3,38 @@ import { Hono } from "hono";
 import users from "./users.js";
 import { userUsecase } from "../lib/container.js";
 import { UserNotFoundError } from "../usecases/userUsecase.js";
+import type { AppEnv } from "../lib/honoTypes.js";
 
 vi.mock("../lib/container.js", () => ({
   userUsecase: {
     getUsers: vi.fn(),
     getUser: vi.fn(),
+    syncUser: vi.fn(),
     registerUser: vi.fn(),
     updateUser: vi.fn(),
     deleteUser: vi.fn(),
   },
 }));
 
-const app = new Hono().route("/users", users);
+const app = new Hono<AppEnv>()
+  .use("/*", async (c, next) => {
+    c.set("user", { id: "uid-1", email: "test@example.com" } as never);
+    await next();
+  })
+  .route("/users", users);
 
 describe("users routes", () => {
   beforeEach(() => vi.clearAllMocks());
+
+  describe("POST /users/sync", () => {
+    it("ユーザーを upsert して返す", async () => {
+      const synced = { user_id: 1, email: "test@example.com" };
+      vi.mocked(userUsecase.syncUser).mockResolvedValue(synced as never);
+      const res = await app.request("/users/sync", { method: "POST" });
+      expect(res.status).toBe(200);
+      expect(await res.json()).toEqual(synced);
+    });
+  });
 
   describe("GET /users", () => {
     it("200 でユーザー一覧を返す", async () => {
@@ -52,10 +69,19 @@ describe("users routes", () => {
       const res = await app.request("/users", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: "bob@example.com" }),
+        body: JSON.stringify({ uid: "uid-2", email: "bob@example.com" }),
       });
       expect(res.status).toBe(201);
       expect(await res.json()).toEqual(created);
+    });
+
+    it("バリデーションエラーのとき 400 を返す", async () => {
+      const res = await app.request("/users", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: "bob@example.com" }),
+      });
+      expect(res.status).toBe(400);
     });
   });
 

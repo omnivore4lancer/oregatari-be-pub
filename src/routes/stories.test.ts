@@ -1,8 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { Hono } from "hono";
 import stories from "./stories.js";
-import { storyUsecase } from "../lib/container.js";
+import { storyUsecase, userUsecase, mastraClient } from "../lib/container.js";
 import { StoryNotFoundError } from "../usecases/storyUsecase.js";
+import type { AppEnv } from "../lib/honoTypes.js";
 
 vi.mock("../lib/container.js", () => ({
   storyUsecase: {
@@ -12,9 +13,24 @@ vi.mock("../lib/container.js", () => ({
     updateStory: vi.fn(),
     deleteStory: vi.fn(),
   },
+  userUsecase: {
+    findByUid: vi.fn(),
+  },
+  mastraClient: {
+    createAndStream: vi.fn(),
+  },
 }));
 
-const app = new Hono().route("/stories", stories);
+vi.mock("../lib/mastraClient.js", () => ({
+  forwardWorkflowStream: vi.fn().mockResolvedValue(undefined),
+}));
+
+const app = new Hono<AppEnv>()
+  .use("/*", async (c, next) => {
+    c.set("user", { id: "uid-1" } as never);
+    await next();
+  })
+  .route("/stories", stories);
 
 const validCreateBody = {
   name: "テスト作品",
@@ -29,10 +45,17 @@ describe("stories routes", () => {
   describe("GET /stories", () => {
     it("200 でストーリー一覧を返す", async () => {
       const data = [{ id: 1, name: "テスト" }];
+      vi.mocked(userUsecase.findByUid).mockResolvedValue({ user_id: 1 } as never);
       vi.mocked(storyUsecase.getStories).mockResolvedValue(data as never);
       const res = await app.request("/stories");
       expect(res.status).toBe(200);
       expect(await res.json()).toEqual(data);
+    });
+
+    it("ユーザーが見つからないとき 404 を返す", async () => {
+      vi.mocked(userUsecase.findByUid).mockResolvedValue(null as never);
+      const res = await app.request("/stories");
+      expect(res.status).toBe(404);
     });
   });
 
@@ -55,6 +78,7 @@ describe("stories routes", () => {
   describe("POST /stories", () => {
     it("201 で作成したストーリーを返す", async () => {
       const created = { id: 2, ...validCreateBody };
+      vi.mocked(userUsecase.findByUid).mockResolvedValue({ user_id: 1 } as never);
       vi.mocked(storyUsecase.createStory).mockResolvedValue(created as never);
       const res = await app.request("/stories", {
         method: "POST",
@@ -66,6 +90,7 @@ describe("stories routes", () => {
     });
 
     it("バリデーションエラーのとき 400 を返す", async () => {
+      vi.mocked(userUsecase.findByUid).mockResolvedValue({ user_id: 1 } as never);
       const res = await app.request("/stories", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -95,6 +120,19 @@ describe("stories routes", () => {
       const res = await app.request("/stories/1", { method: "DELETE" });
       expect(res.status).toBe(200);
       expect(await res.json()).toEqual({ message: "Deleted" });
+    });
+  });
+
+  describe("POST /stories/:id/generate", () => {
+    it("text/event-stream で SSE を返す", async () => {
+      const emptyBody = new ReadableStream({ start(c) { c.close(); } });
+      vi.mocked(mastraClient.createAndStream).mockResolvedValue({
+        runId: "run-1",
+        response: new Response(emptyBody),
+      } as never);
+      const res = await app.request("/stories/1/generate", { method: "POST" });
+      expect(res.status).toBe(200);
+      expect(res.headers.get("content-type")).toContain("text/event-stream");
     });
   });
 });
