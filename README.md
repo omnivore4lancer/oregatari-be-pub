@@ -128,7 +128,7 @@ CORS_ORIGIN="http://localhost:5173"
 │  Supabase            │   │  oregatari-mastra (Mastra)         │
 │  PostgreSQL          │◄──│  localhost:4111                    │
 │  localhost:54322     │   │  ・Workflow エンジン                │
-└──────────────────────┘   │  ・AI Agent (Claude)               │
+└──────────────────────┘   │  ・AI Agent (Gemini / GPT)         │
                            │  ・Prisma で DB に直接書き込み      │
                            └────────────────────────────────────┘
 ```
@@ -159,7 +159,7 @@ sequenceDiagram
     participant FE as FE (React)
     participant BE as BE (Hono)
     participant MA as Mastra
-    participant AI as Claude (AI)
+    participant AI as AI モデル
     participant DB as Supabase (PostgreSQL)
 
     FE->>BE: POST /stories/:id/generate (SSE 接続)
@@ -187,7 +187,7 @@ sequenceDiagram
     participant FE as FE (React)
     participant BE as BE (Hono)
     participant MA as Mastra
-    participant AI as Claude / 画像モデル
+    participant AI as AI モデル / 画像モデル
     participant DB as Supabase (PostgreSQL)
 
     FE->>BE: POST /episodes/:episodeId/pages/generate-image-job
