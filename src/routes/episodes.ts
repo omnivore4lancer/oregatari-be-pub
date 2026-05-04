@@ -108,4 +108,28 @@ app.delete("/:episodeId", async (c) => {
   }
 });
 
+app.post("/:episodeId/publish", async (c) => {
+  const storyId = numericId.parse(c.req.param("storyId"));
+  const episodeId = numericId.parse(c.req.param("episodeId"));
+  try {
+    const episode = await episodeUsecase.updateEpisode(storyId, episodeId, { status: "PUBLISHED" });
+    return c.json(episode);
+  } catch (e) {
+    if (e instanceof EpisodeNotFoundError) return c.json({ error: e.message }, 404);
+    throw e;
+  }
+});
+
+app.post("/:episodeId/unpublish", async (c) => {
+  const storyId = numericId.parse(c.req.param("storyId"));
+  const episodeId = numericId.parse(c.req.param("episodeId"));
+  try {
+    const episode = await episodeUsecase.updateEpisode(storyId, episodeId, { status: "UNPUBLISHED" });
+    return c.json(episode);
+  } catch (e) {
+    if (e instanceof EpisodeNotFoundError) return c.json({ error: e.message }, 404);
+    throw e;
+  }
+});
+
 export default app;
