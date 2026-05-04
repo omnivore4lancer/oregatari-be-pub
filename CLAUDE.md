@@ -79,6 +79,7 @@ DATABASE_URL="postgresql://postgres:postgres@127.0.0.1:54322/postgres"
 SUPABASE_URL="http://127.0.0.1:54321"
 SUPABASE_PUBLISHABLE_KEY="..."
 SUPABASE_SECRET_KEY="..."
+SUPABASE_JWT_SECRET="..."   # supabase status で確認（JWT secret）
 MASTRA_URL="http://localhost:4111"
 MASTRA_SECRET="..."
 ```

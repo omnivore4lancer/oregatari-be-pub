@@ -1,7 +1,7 @@
-import type { User } from "@supabase/supabase-js";
+export type AuthUser = { id: string; email?: string };
 
 export type AppEnv = {
   Variables: {
-    user: User;
+    user: AuthUser;
   };
 };

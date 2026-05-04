@@ -16,6 +16,7 @@ import publishSettings from "./routes/publishSettings.js";
 import characterRelationships from "./routes/characterRelationships.js";
 import episodePages from "./routes/episodePages.js";
 import jobs from "./routes/jobs.js";
+import publicStories from "./routes/publicStories.js";
 
 const app = new Hono();
 
@@ -27,6 +28,9 @@ app.use(
     allowHeaders: ["Content-Type", "Authorization"],
   })
 );
+
+app.route("/public", publicStories);
+app.get("/ping", (c) => c.json({ ok: true }));
 
 app.use("/*", authMiddleware);
 

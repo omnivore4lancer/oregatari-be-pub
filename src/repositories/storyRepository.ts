@@ -15,9 +15,9 @@ function formatStory<T extends { storyGenres: { genre: { id: number; name: strin
 export class StoryRepository {
   constructor(private readonly prisma: PrismaClient) {}
 
-  async findAll(userId: number) {
+  async findAll(uid: string) {
     const stories = await this.prisma.story.findMany({
-      where: { userId },
+      where: { user: { uid } },
       include: {
         ...includeGenres,
         publishSettings: { select: { coverImageUrl: true } },
@@ -52,21 +52,31 @@ export class StoryRepository {
     return count > 0;
   }
 
+  async isOwnedByUid(storyId: number, uid: string): Promise<boolean> {
+    const count = await this.prisma.story.count({ where: { id: storyId, user: { uid } } });
+    return count > 0;
+  }
+
   async findById(id: number) {
     const story = await this.prisma.story.findUnique({
       where: { id },
-      include: { ...includeGenres, characters: true },
+      include: {
+        ...includeGenres,
+        characters: true,
+        publishSettings: { select: { coverImageUrl: true } },
+      },
     });
     if (!story) return null;
-    return formatStory(story);
+    const { publishSettings, ...rest } = story;
+    return { ...formatStory(rest), coverImageUrl: publishSettings?.coverImageUrl ?? null };
   }
 
-  async create(input: CreateStoryInput, userId: number) {
+  async create(input: CreateStoryInput, uid: string) {
     const { genreIds, ...rest } = input;
     const story = await this.prisma.story.create({
       data: {
         ...rest,
-        userId,
+        user: { connect: { uid } },
         storyGenres: { create: genreIds.map((genreId) => ({ genreId })) },
       },
       include: includeGenres,
@@ -91,6 +101,57 @@ export class StoryRepository {
       include: includeGenres,
     });
     return formatStory(story);
+  }
+
+  async findPublicById(id: number) {
+    const story = await this.prisma.story.findUnique({
+      where: { id },
+      include: {
+        storyGenres: { include: { genre: true } },
+        user: { select: { name: true } },
+        publishSettings: {
+          select: {
+            coverImageUrl: true,
+            description: true,
+            tags: true,
+            publishedAt: true,
+          },
+        },
+        episodes: {
+          where: { status: 'PUBLISHED' },
+          orderBy: { number: 'asc' },
+          include: {
+            pages: {
+              take: 1,
+              orderBy: { pageNumber: 'asc' },
+              where: { imageUrl: { not: null } },
+              select: { imageUrl: true },
+            },
+          },
+        },
+      },
+    });
+    if (!story) return null;
+    const { storyGenres, user, publishSettings, episodes, ...rest } = story;
+    const published = episodes.filter((e) => e.status === 'PUBLISHED');
+    return {
+      ...rest,
+      genres: storyGenres.map((sg) => sg.genre),
+      authorName: user?.name ?? null,
+      description: publishSettings?.description ?? null,
+      tags: publishSettings?.tags ?? [],
+      coverImageUrl: publishSettings?.coverImageUrl ?? null,
+      publishedAt: publishSettings?.publishedAt ?? null,
+      firstEpisodeCreatedAt: published[0]?.createdAt ?? null,
+      latestEpisodeCreatedAt: published[published.length - 1]?.createdAt ?? null,
+      episodes: published.map((ep) => ({
+        id: ep.id,
+        number: ep.number,
+        title: ep.title,
+        thumbnailUrl: ep.pages[0]?.imageUrl ?? null,
+        createdAt: ep.createdAt,
+      })),
+    };
   }
 
   async delete(id: number) {

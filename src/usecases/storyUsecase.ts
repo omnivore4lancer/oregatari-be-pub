@@ -4,8 +4,8 @@ import type { CreateStoryInput, UpdateStoryInput } from "../schemas/story.js";
 export class StoryUsecase {
   constructor(private readonly storyRepo: StoryRepository) {}
 
-  getStories(userId: number) {
-    return this.storyRepo.findAll(userId);
+  getStories(uid: string) {
+    return this.storyRepo.findAll(uid);
   }
 
   async getStory(id: number) {
@@ -14,8 +14,8 @@ export class StoryUsecase {
     return story;
   }
 
-  createStory(input: CreateStoryInput, userId: number) {
-    return this.storyRepo.create(input, userId);
+  createStory(input: CreateStoryInput, uid: string) {
+    return this.storyRepo.create(input, uid);
   }
 
   updateStory(id: number, input: UpdateStoryInput) {
@@ -26,8 +26,16 @@ export class StoryUsecase {
     return this.storyRepo.delete(id);
   }
 
+  getPublicStory(id: number) {
+    return this.storyRepo.findPublicById(id);
+  }
+
   isOwnedBy(storyId: number, userId: number) {
     return this.storyRepo.isOwnedBy(storyId, userId);
+  }
+
+  isOwnedByUid(storyId: number, uid: string) {
+    return this.storyRepo.isOwnedByUid(storyId, uid);
   }
 }
 

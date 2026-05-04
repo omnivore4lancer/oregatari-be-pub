@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { stream } from "hono/streaming";
-import { storyUsecase, userUsecase, mastraClient } from "../lib/container.js";
+import { storyUsecase, mastraClient } from "../lib/container.js";
 import { forwardWorkflowStream } from "../lib/mastraClient.js";
 import type { AppEnv } from "../lib/honoTypes.js";
 import { createStorySchema, updateStorySchema } from "../schemas/story.js";
@@ -9,15 +9,8 @@ import { numericId } from "../lib/params.js";
 
 const app = new Hono<AppEnv>();
 
-async function resolveUserId(uid: string): Promise<number | null> {
-  const user = await userUsecase.findByUid(uid);
-  return user?.user_id ?? null;
-}
-
 app.get("/", async (c) => {
-  const userId = await resolveUserId(c.get("user").id);
-  if (!userId) return c.json({ error: "User not found" }, 404);
-  const stories = await storyUsecase.getStories(userId);
+  const stories = await storyUsecase.getStories(c.get("user").id);
   return c.json(stories);
 });
 
@@ -33,11 +26,9 @@ app.get("/:id", async (c) => {
 });
 
 app.post("/", async (c) => {
-  const userId = await resolveUserId(c.get("user").id);
-  if (!userId) return c.json({ error: "User not found" }, 404);
   const result = createStorySchema.safeParse(await c.req.json());
   if (!result.success) return c.json({ error: "Validation error", details: result.error.issues }, 400);
-  const story = await storyUsecase.createStory(result.data, userId);
+  const story = await storyUsecase.createStory(result.data, c.get("user").id);
   return c.json(story, 201);
 });
 

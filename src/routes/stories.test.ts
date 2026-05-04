@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { Hono } from "hono";
 import stories from "./stories.js";
-import { storyUsecase, userUsecase, mastraClient } from "../lib/container.js";
+import { storyUsecase, mastraClient } from "../lib/container.js";
 import { StoryNotFoundError } from "../usecases/storyUsecase.js";
 import type { AppEnv } from "../lib/honoTypes.js";
 
@@ -12,9 +12,6 @@ vi.mock("../lib/container.js", () => ({
     createStory: vi.fn(),
     updateStory: vi.fn(),
     deleteStory: vi.fn(),
-  },
-  userUsecase: {
-    findByUid: vi.fn(),
   },
   mastraClient: {
     createAndStream: vi.fn(),
@@ -45,17 +42,10 @@ describe("stories routes", () => {
   describe("GET /stories", () => {
     it("200 でストーリー一覧を返す", async () => {
       const data = [{ id: 1, name: "テスト" }];
-      vi.mocked(userUsecase.findByUid).mockResolvedValue({ user_id: 1 } as never);
       vi.mocked(storyUsecase.getStories).mockResolvedValue(data as never);
       const res = await app.request("/stories");
       expect(res.status).toBe(200);
       expect(await res.json()).toEqual(data);
-    });
-
-    it("ユーザーが見つからないとき 404 を返す", async () => {
-      vi.mocked(userUsecase.findByUid).mockResolvedValue(null as never);
-      const res = await app.request("/stories");
-      expect(res.status).toBe(404);
     });
   });
 
@@ -78,7 +68,6 @@ describe("stories routes", () => {
   describe("POST /stories", () => {
     it("201 で作成したストーリーを返す", async () => {
       const created = { id: 2, ...validCreateBody };
-      vi.mocked(userUsecase.findByUid).mockResolvedValue({ user_id: 1 } as never);
       vi.mocked(storyUsecase.createStory).mockResolvedValue(created as never);
       const res = await app.request("/stories", {
         method: "POST",
@@ -90,7 +79,6 @@ describe("stories routes", () => {
     });
 
     it("バリデーションエラーのとき 400 を返す", async () => {
-      vi.mocked(userUsecase.findByUid).mockResolvedValue({ user_id: 1 } as never);
       const res = await app.request("/stories", {
         method: "POST",
         headers: { "Content-Type": "application/json" },

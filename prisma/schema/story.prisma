@@ -99,6 +99,7 @@ model Character {
   skills             String[]
   avatarColor        String?                @map("avatar_color")
   imageUrl           String?                @map("image_url")
+  faceImageUrl       String?                @map("face_image_url")
   imagePrompt        String?                @map("image_prompt")
   story              Story                  @relation(fields: [storyId], references: [id])
   relationshipsFrom  CharacterRelationship[] @relation("RelationshipFrom")
@@ -277,9 +278,10 @@ model EpisodePage {
   pageNumber   Int              @map("page_number")
   instructions String?
   imagePrompt  String?          @map("image_prompt")
-  imageUrl     String?          @map("image_url")
-  episode      Episode          @relation(fields: [episodeId], references: [id])
-  rows         EpisodePageRow[]
+  imageUrl        String?          @map("image_url")
+  displayImageUrl String?          @map("display_image_url")
+  episode         Episode          @relation(fields: [episodeId], references: [id])
+  rows            EpisodePageRow[]
   createdAt    DateTime         @default(now()) @map("created_at")
   updatedAt    DateTime         @updatedAt @map("updated_at")
 
