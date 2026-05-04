@@ -35,7 +35,7 @@ export class MastraClient {
   private headers(withContentType = true): Record<string, string> {
     const h: Record<string, string> = {}
     if (withContentType) h["Content-Type"] = "application/json"
-    if (process.env.MASTRA_SECRET) h["X-Internal-Secret"] = process.env.MASTRA_SECRET
+    if (process.env.MASTRA_JWT_TOKEN) h["Authorization"] = `Bearer ${process.env.MASTRA_JWT_TOKEN}`
     return h
   }
 
