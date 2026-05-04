@@ -104,6 +104,128 @@ CORS_ORIGIN="http://localhost:5173"
 | 公開設定 | `/stories/:storyId/publish` |
 | ジョブ | `/jobs` |
 
+## FE / BE / Mastra の連携
+
+### システム全体像
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│  oregatari-fe (React)                                       │
+│  localhost:5173                                             │
+└──────────────────────┬──────────────────────────────────────┘
+                       │ REST / SSE  (Authorization: Bearer JWT)
+                       ▼
+┌─────────────────────────────────────────────────────────────┐
+│  oregatari-be (Hono / Vercel)                               │
+│  localhost:3000                                             │
+│  ・認証 (Supabase JWT 検証)                                  │
+│  ・CRUD (Prisma → Supabase)                                 │
+│  ・AI ジョブ管理 (MastraClient)                              │
+└──────────┬────────────────────────────┬─────────────────────┘
+           │ Prisma (DATABASE_URL)       │ HTTP (MASTRA_URL)
+           ▼                            ▼
+┌──────────────────────┐   ┌────────────────────────────────────┐
+│  Supabase            │   │  oregatari-mastra (Mastra)         │
+│  PostgreSQL          │◄──│  localhost:4111                    │
+│  localhost:54322     │   │  ・Workflow エンジン                │
+└──────────────────────┘   │  ・AI Agent (Claude)               │
+                           │  ・Prisma で DB に直接書き込み      │
+                           └────────────────────────────────────┘
+```
+
+### フロー 1: 通常の CRUD
+
+```mermaid
+sequenceDiagram
+    participant FE as FE (React)
+    participant BE as BE (Hono)
+    participant DB as Supabase (PostgreSQL)
+
+    FE->>BE: REST API (Authorization: Bearer JWT)
+    BE->>DB: JWT 検証 (Supabase Auth)
+    DB-->>BE: ユーザー情報
+    BE->>DB: Prisma クエリ (CRUD)
+    DB-->>BE: 結果
+    BE-->>FE: JSON レスポンス
+```
+
+### フロー 2: AI ストリーミング生成 (SSE)
+
+ストーリー生成・キャラクター三面図・エピソード生成などで使用。
+FE はリアルタイムにテキストを受け取りながら表示できます。
+
+```mermaid
+sequenceDiagram
+    participant FE as FE (React)
+    participant BE as BE (Hono)
+    participant MA as Mastra
+    participant AI as Claude (AI)
+    participant DB as Supabase (PostgreSQL)
+
+    FE->>BE: POST /stories/:id/generate (SSE 接続)
+    BE->>MA: POST /api/workflows/story-generation-workflow/stream
+    MA->>DB: ストーリー情報を取得 (Prisma)
+    DB-->>MA: Story / Character データ
+    MA->>AI: プロンプト送信
+    AI-->>MA: テキストストリーム
+    MA-->>BE: SSE イベント (workflow-step-output)
+    BE-->>FE: SSE イベント転送 (data: {"text": "..."})
+    MA->>DB: 生成結果を保存 (Prisma)
+    MA-->>BE: ストリーム終了
+    BE-->>FE: ストリーム終了
+```
+
+> 同様のパターン: `character-three-view-workflow` / `episode-generation-workflow` / `panel-layout-workflow` / `page-prompt-workflow`
+
+### フロー 3: バックグラウンドジョブ (画像生成など)
+
+画像生成・パネルレイアウト生成など時間のかかる処理で使用。
+FE はジョブ ID を受け取り、SSE で進行状況を監視します。
+
+```mermaid
+sequenceDiagram
+    participant FE as FE (React)
+    participant BE as BE (Hono)
+    participant MA as Mastra
+    participant AI as Claude / 画像モデル
+    participant DB as Supabase (PostgreSQL)
+
+    FE->>BE: POST /episodes/:episodeId/pages/generate-image-job
+    BE->>MA: POST /create-run  →  runId 取得
+    BE->>MA: POST /start?runId=... (非同期実行開始)
+    BE->>DB: Job レコード作成 (status=RUNNING)
+    BE-->>FE: { jobId }
+
+    FE->>BE: GET /jobs/:jobId/events (SSE 接続)
+    BE->>MA: POST /observe?runId=... (進行監視)
+    MA->>DB: エピソード・ページ情報を取得
+    MA->>AI: 画像生成リクエスト
+    AI-->>MA: 生成結果
+    MA->>DB: 画像 URL を保存
+    MA-->>BE: SSE イベント
+    BE-->>FE: SSE イベント転送
+    MA-->>BE: ストリーム終了
+    BE->>MA: GET /runs/:runId (最終ステータス確認)
+    MA-->>BE: { status: "success" }
+    BE->>DB: Job を DONE に更新
+    BE-->>FE: data: { status: "success" }
+```
+
+> 同様のパターン: `panel-layout-full-workflow` (パネルレイアウト) / `cover-image-workflow` (表紙画像)
+
+### Mastra ワークフロー一覧
+
+| ワークフロー ID | 用途 | 呼び出し方式 |
+|---|---|---|
+| `story-generation-workflow` | ストーリー構成生成 | SSE ストリーム |
+| `character-three-view-workflow` | キャラクター三面図生成 | SSE ストリーム |
+| `episode-generation-workflow` | エピソード本文生成 | SSE ストリーム |
+| `panel-layout-workflow` | ページレイアウト生成（同期） | SSE ストリーム |
+| `page-prompt-workflow` | ページ画像プロンプト生成 | SSE ストリーム |
+| `panel-layout-full-workflow` | ページレイアウト生成（ジョブ） | バックグラウンドジョブ |
+| `page-image-workflow` | ページ画像生成 | バックグラウンドジョブ |
+| `cover-image-workflow` | 表紙画像生成 | バックグラウンドジョブ |
+
 ## DB スキーマ概要
 
 主要モデルの関係:
