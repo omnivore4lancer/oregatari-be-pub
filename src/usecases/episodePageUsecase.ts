@@ -8,6 +8,10 @@ export class EpisodePageUsecase {
     return this.repo.findByEpisodeId(episodeId);
   }
 
+  getPublicPages(episodeId: number) {
+    return this.repo.findPublicByEpisodeId(episodeId);
+  }
+
   savePage(episodeId: number, input: SaveEpisodePageInput) {
     return this.repo.upsert(episodeId, input);
   }

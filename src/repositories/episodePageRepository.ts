@@ -78,6 +78,15 @@ export class EpisodePageRepository {
     return this.findByEpisodeIdAndPageNumber(episodeId, input.pageNumber);
   }
 
+  async findPublicByEpisodeId(episodeId: number) {
+    const episode = await this.prisma.episode.findFirst({
+      where: { id: episodeId, status: "PUBLISHED" },
+      select: { id: true },
+    });
+    if (!episode) return null;
+    return this.findByEpisodeId(episodeId);
+  }
+
   async deleteByEpisodeId(episodeId: number) {
     return this.prisma.episodePage.deleteMany({ where: { episodeId } });
   }
