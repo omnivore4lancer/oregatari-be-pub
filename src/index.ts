@@ -20,10 +20,13 @@ import publicStories from "./routes/publicStories.js";
 
 const app = new Hono();
 
+const corsOrigin = process.env.CORS_ORIGIN;
+if (!corsOrigin) throw new Error("CORS_ORIGIN environment variable is required");
+
 app.use(
   "/*",
   cors({
-    origin: process.env.CORS_ORIGIN ?? "*",
+    origin: corsOrigin,
     allowMethods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allowHeaders: ["Content-Type", "Authorization"],
   })

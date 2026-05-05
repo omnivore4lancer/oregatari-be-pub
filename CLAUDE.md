@@ -82,6 +82,7 @@ SUPABASE_SECRET_KEY="..."
 SUPABASE_JWT_SECRET="..."   # supabase status で確認（JWT secret）
 MASTRA_URL="http://localhost:4111"
 MASTRA_SECRET="..."
+CORS_ORIGIN="http://localhost:3000"  # 本番では FE のオリジンを設定（必須）
 ```
 
 `MASTRA_SECRET` は BE → Mastra 間の内部通信に使う共有シークレット。`MastraClient` がすべてのリクエストに `X-Internal-Secret` ヘッダーとして付与する。Mastra 側も同じ値を `.env` に設定すること（未設定の場合は認証スキップ）。
