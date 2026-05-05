@@ -1,8 +1,13 @@
+import type { EpisodePageRepository } from "../repositories/episodePageRepository.js";
 import type { EpisodeRepository } from "../repositories/episodeRepository.js";
+import { convertEpisodePagesToWebP } from "../lib/imageCompressService.js";
 import type { CreateEpisodeInput, UpdateEpisodeInput } from "../schemas/episode.js";
 
 export class EpisodeUsecase {
-  constructor(private readonly repo: EpisodeRepository) {}
+  constructor(
+    private readonly repo: EpisodeRepository,
+    private readonly pageRepo: EpisodePageRepository,
+  ) {}
 
   getEpisodes(storyId: number, status?: string, relation?: string) {
     return this.repo.findByStoryId(storyId, status, relation);
@@ -27,6 +32,25 @@ export class EpisodeUsecase {
   async deleteEpisode(storyId: number, episodeId: number) {
     await this.getEpisode(storyId, episodeId);
     return this.repo.delete(episodeId);
+  }
+
+  async publishEpisode(storyId: number, episodeId: number) {
+    const episode = await this.updateEpisode(storyId, episodeId, { status: "PUBLISHED" });
+
+    const pages = await this.pageRepo.findPageUrlsByEpisodeId(episodeId);
+    if (pages.length > 0) {
+      const urlMap = await convertEpisodePagesToWebP(
+        episodeId,
+        pages.map((p) => ({ pageId: p.id, pageNumber: p.pageNumber, imageUrl: p.imageUrl! })),
+      );
+      await Promise.all(
+        [...urlMap.entries()].map(([pageId, displayImageUrl]) =>
+          this.pageRepo.updateDisplayImageUrl(pageId, displayImageUrl),
+        ),
+      );
+    }
+
+    return episode;
   }
 }
 

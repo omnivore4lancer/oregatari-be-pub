@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { EpisodeUsecase, EpisodeNotFoundError } from "./episodeUsecase.js";
 import type { EpisodeRepository } from "../repositories/episodeRepository.js";
+import type { EpisodePageRepository } from "../repositories/episodePageRepository.js";
 
 function makeRepo(overrides: Partial<EpisodeRepository> = {}): EpisodeRepository {
   return {
@@ -13,13 +14,26 @@ function makeRepo(overrides: Partial<EpisodeRepository> = {}): EpisodeRepository
   } as unknown as EpisodeRepository;
 }
 
+function makePageRepo(overrides: Partial<EpisodePageRepository> = {}): EpisodePageRepository {
+  return {
+    findByEpisodeId: vi.fn(),
+    findByEpisodeIdAndPageNumber: vi.fn(),
+    upsert: vi.fn(),
+    findPublicByEpisodeId: vi.fn(),
+    findPageUrlsByEpisodeId: vi.fn().mockResolvedValue([]),
+    updateDisplayImageUrl: vi.fn(),
+    deleteByEpisodeId: vi.fn(),
+    ...overrides,
+  } as unknown as EpisodePageRepository;
+}
+
 describe("EpisodeUsecase", () => {
   let repo: EpisodeRepository;
   let usecase: EpisodeUsecase;
 
   beforeEach(() => {
     repo = makeRepo();
-    usecase = new EpisodeUsecase(repo);
+    usecase = new EpisodeUsecase(repo, makePageRepo());
   });
 
   describe("getEpisodes", () => {

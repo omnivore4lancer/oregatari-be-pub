@@ -112,7 +112,7 @@ app.post("/:episodeId/publish", async (c) => {
   const storyId = numericId.parse(c.req.param("storyId"));
   const episodeId = numericId.parse(c.req.param("episodeId"));
   try {
-    const episode = await episodeUsecase.updateEpisode(storyId, episodeId, { status: "PUBLISHED" });
+    const episode = await episodeUsecase.publishEpisode(storyId, episodeId);
     return c.json(episode);
   } catch (e) {
     if (e instanceof EpisodeNotFoundError) return c.json({ error: e.message }, 404);

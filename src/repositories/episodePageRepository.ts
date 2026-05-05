@@ -87,6 +87,20 @@ export class EpisodePageRepository {
     return this.findByEpisodeId(episodeId);
   }
 
+  findPageUrlsByEpisodeId(episodeId: number) {
+    return this.prisma.episodePage.findMany({
+      where: { episodeId, imageUrl: { not: null }, displayImageUrl: null },
+      select: { id: true, pageNumber: true, imageUrl: true },
+    });
+  }
+
+  updateDisplayImageUrl(pageId: number, displayImageUrl: string) {
+    return this.prisma.episodePage.update({
+      where: { id: pageId },
+      data: { displayImageUrl },
+    });
+  }
+
   async deleteByEpisodeId(episodeId: number) {
     return this.prisma.episodePage.deleteMany({ where: { episodeId } });
   }
