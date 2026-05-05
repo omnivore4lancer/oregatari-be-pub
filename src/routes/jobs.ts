@@ -3,8 +3,9 @@ import { z } from "zod";
 import { jobUsecase, mastraClient } from "../lib/container.js";
 import { mastraErrorMessage, type MastraRun } from "../lib/mastraClient.js";
 import { JobStatus, JobType } from "../repositories/jobRepository.js";
+import type { AppEnv } from "../lib/honoTypes.js";
 
-const app = new Hono();
+const app = new Hono<AppEnv>();
 
 const listQuerySchema = z.object({
   page: z.coerce.number().int().positive().default(1),
@@ -17,6 +18,7 @@ app.get("/", async (c) => {
   const result = listQuerySchema.safeParse(c.req.query());
   if (!result.success) return c.json({ error: "Validation error", details: result.error.issues }, 400);
   const { page, limit, status, jobType } = result.data;
+  const uid = c.get("user").id;
 
   // RUNNING ジョブの Mastra 実行状態を確認し、完了済みなら DB を更新する
   const runningJobs = await jobUsecase.findRunning();
@@ -36,8 +38,8 @@ app.get("/", async (c) => {
   }
 
   const [jobs, total] = await Promise.all([
-    jobUsecase.findAll({ page, limit, status, jobType }),
-    jobUsecase.countAll({ status, jobType }),
+    jobUsecase.findAll({ page, limit, status, jobType, uid }),
+    jobUsecase.countAll({ status, jobType, uid }),
   ]);
   return c.json({ jobs, total, page, limit });
 });
@@ -57,8 +59,9 @@ async function syncJobStatus(jobId: string, run: MastraRun) {
 }
 
 app.get("/:jobId", async (c) => {
+  const uid = c.get("user").id;
   const jobId = c.req.param("jobId");
-  const job = await jobUsecase.findById(jobId);
+  const job = await jobUsecase.findByIdForUser(jobId, uid);
   if (!job) return c.json({ error: "Job not found" }, 404);
 
   if (job.status === JobStatus.RUNNING) {
@@ -77,8 +80,9 @@ app.get("/:jobId", async (c) => {
 });
 
 app.get("/:jobId/events", async (c) => {
+  const uid = c.get("user").id;
   const jobId = c.req.param("jobId");
-  const job = await jobUsecase.findById(jobId);
+  const job = await jobUsecase.findByIdForUser(jobId, uid);
   if (!job) return c.json({ error: "Job not found" }, 404);
 
   const workflowId = mastraClient.workflowIdForJobType(job.jobType);

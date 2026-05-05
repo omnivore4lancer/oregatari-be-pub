@@ -42,8 +42,26 @@ export class JobRepository {
     });
   }
 
-  findAll({ page, limit, status, jobType }: { page: number; limit: number; status?: JobStatus; jobType?: JobType }) {
+  private async userWhere(uid: string) {
+    const rows = await this.prisma.story.findMany({ where: { user: { uid } }, select: { id: true } });
+    const storyIds = rows.map((r) => r.id);
+    return {
+      OR: [
+        { episode: { story: { user: { uid } } } },
+        { storyId: { in: storyIds } },
+      ],
+    };
+  }
+
+  async findByIdForUser(id: string, uid: string) {
+    const uw = await this.userWhere(uid);
+    return this.prisma.job.findFirst({ where: { id, ...uw } });
+  }
+
+  async findAll({ page, limit, status, jobType, uid }: { page: number; limit: number; status?: JobStatus; jobType?: JobType; uid: string }) {
+    const uw = await this.userWhere(uid);
     const where = {
+      ...uw,
       ...(status ? { status } : {}),
       ...(jobType ? { jobType } : {}),
     };
@@ -75,8 +93,10 @@ export class JobRepository {
     });
   }
 
-  countAll({ status, jobType }: { status?: JobStatus; jobType?: JobType }) {
+  async countAll({ status, jobType, uid }: { status?: JobStatus; jobType?: JobType; uid: string }) {
+    const uw = await this.userWhere(uid);
     const where = {
+      ...uw,
       ...(status ? { status } : {}),
       ...(jobType ? { jobType } : {}),
     };

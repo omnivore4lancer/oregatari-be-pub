@@ -16,6 +16,10 @@ export class JobUsecase {
     return this.repo.findById(id);
   }
 
+  findByIdForUser(id: string, uid: string) {
+    return this.repo.findByIdForUser(id, uid);
+  }
+
   findRunningByEpisodeId(episodeId: number) {
     return this.repo.findRunningByEpisodeId(episodeId);
   }
@@ -32,11 +36,11 @@ export class JobUsecase {
     return this.repo.findRunning();
   }
 
-  findAll(params: { page: number; limit: number; status?: JobStatus; jobType?: JobType }) {
+  findAll(params: { page: number; limit: number; status?: JobStatus; jobType?: JobType; uid: string }) {
     return this.repo.findAll(params);
   }
 
-  countAll(params: { status?: JobStatus; jobType?: JobType }) {
+  countAll(params: { status?: JobStatus; jobType?: JobType; uid: string }) {
     return this.repo.countAll(params);
   }
 
