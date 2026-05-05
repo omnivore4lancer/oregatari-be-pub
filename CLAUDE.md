@@ -81,8 +81,8 @@ SUPABASE_PUBLISHABLE_KEY="..."
 SUPABASE_SECRET_KEY="..."
 SUPABASE_JWT_SECRET="..."   # supabase status で確認（JWT secret）
 MASTRA_URL="http://localhost:4111"
-MASTRA_SECRET="..."
+MASTRA_JWT_TOKEN="..."  # Mastra Cloud の JWT トークン（未設定の場合は認証ヘッダーなし）
 CORS_ORIGIN="http://localhost:3000"  # 本番では FE のオリジンを設定（必須）
 ```
 
-`MASTRA_SECRET` は BE → Mastra 間の内部通信に使う共有シークレット。`MastraClient` がすべてのリクエストに `X-Internal-Secret` ヘッダーとして付与する。Mastra 側も同じ値を `.env` に設定すること（未設定の場合は認証スキップ）。
+`MASTRA_JWT_TOKEN` は BE → Mastra 間の内部認証に使うトークン。`MastraClient` がすべてのリクエストに `Authorization: Bearer <token>` ヘッダーとして付与する。未設定の場合は認証ヘッダーなしで送信される。

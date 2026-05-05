@@ -82,11 +82,11 @@ SUPABASE_URL="http://127.0.0.1:54321"
 SUPABASE_PUBLISHABLE_KEY="..."
 SUPABASE_SECRET_KEY="..."
 MASTRA_URL="http://localhost:4111"
-MASTRA_SECRET="..."
+MASTRA_JWT_TOKEN="..."  # Mastra Cloud の JWT トークン（未設定の場合は認証ヘッダーなし）
 CORS_ORIGIN="http://localhost:5173"
 ```
 
-`MASTRA_SECRET` は BE → Mastra 間の内部通信に使う共有シークレット。`MastraClient` がすべてのリクエストに `X-Internal-Secret` ヘッダーとして付与します。Mastra 側も同じ値を設定してください。
+`MASTRA_JWT_TOKEN` は BE → Mastra 間の内部認証に使うトークン。`MastraClient` がすべてのリクエストに `Authorization: Bearer <token>` ヘッダーとして付与します。未設定の場合は認証ヘッダーなしで送信されます。
 
 ## API エンドポイント
 
